@@ -13,15 +13,21 @@ import (
 	"github.com/khorzhenwin/go-balance/types"
 )
 
+// Round robin load balancing to get the next healthy server
 func getNextServer(lb *types.LoadBalancer, servers []*types.Server) *types.Server {
+	// Lock the load balancer to ensure thread safety
 	lb.Mutex.Lock()
+	// Unlock the load balancer when done
 	defer lb.Mutex.Unlock()
 
 	for i := 0; i < len(servers); i++ {
+		// Get the next server index using round robin
 		idx := lb.Current % len(servers)
 		nextServer := servers[idx]
+		// Increment the current index for the next call
 		lb.Current++
 
+		// Check if the server is healthy
 		nextServer.Mutex.Lock()
 		isHealthy := nextServer.IsHealthy
 		nextServer.Mutex.Unlock()
@@ -30,7 +36,7 @@ func getNextServer(lb *types.LoadBalancer, servers []*types.Server) *types.Serve
 			return nextServer
 		}
 	}
-
+	// No healthy server found
 	return nil
 }
 
@@ -49,6 +55,7 @@ func healthCheck(s *types.Server, healthCheckInterval time.Duration) {
 	}
 }
 
+// ReverseProxy to forward request to the selected server
 func ReverseProxy(s *types.Server) *httputil.ReverseProxy {
 	return httputil.NewSingleHostReverseProxy(s.URL)
 }
